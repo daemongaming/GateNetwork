@@ -1,0 +1,37 @@
+name: GateNetwork
+main: com.kraken.gatenetwork.GateNetwork
+version: 0.2.1 (alpha)
+api-version: 1.20
+description: A Minecraft plugin for custom multiworld portals with support for multiple servers.
+author: kraken
+commands: 
+     gate:
+        description: Info on the GateNetwork plugin.
+        usage: /<command>
+     gate build:
+        description: Builds a default gate structure from file based on your location.
+        usage: /<command>
+        aliases: [gate place]
+     gate new:
+        description: Sets the gate for the world with your location as the center-bottom block of the ring.
+        usage: /<command>
+     gate delete:
+        description: Permanently removes the gate info for the world the command is used in.
+        usage: /<command>
+        aliases: [gate remove, gate del]
+     gate set:
+        description: Sets the setting for a world's gate to the value input. Options are name, pointoforigin, address
+        usage: /<command> <world> <setting> <value>
+     gate connect:
+        description: Establishes a wormhole connection between your world's gate (or a specified world) and a destination world's gate.
+        usage: /<command> <from_world_OPT> <to_world>
+        aliases: [gate dial, gate activate]
+     gate info:
+        description: Displays information about a world's gate.
+        usage: /<command> <world>
+     gate list:
+        description: Lists all gates in the server network.
+        usage: /<command>
+     gate toggle:
+        description: Toggles the specified plugin configuration option between on/off (true/false). Options are silent_mode, debug_mode, easy_mode
+        usage: /<command> <option>
