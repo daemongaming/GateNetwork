@@ -1,6 +1,8 @@
 package com.kraken.gatenetwork;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -9,23 +11,22 @@ import org.bukkit.entity.Player;
 
 public class Messages {
 
+	//Main instance
 	private GateNetwork plugin;
-	String language;
-	String VERSION;
-	boolean silentMode;
 	
-    File msgFile;
-    FileConfiguration msgFileConfig;
+	//Globals
+	private String language;
+	private static ArrayList<String> LANGUAGES = new ArrayList<String>(Arrays.asList("english","spanish"));
+	private boolean silentMode;
+    private File msgFile;
+    private FileConfiguration msgFileConfig;
 	
     //Constructor
 	public Messages(GateNetwork plugin, String language) {
-		
-		  this.plugin = plugin;
-          this.silentMode = plugin.getConfig().getBoolean("silent_mode");
-          this.VERSION = plugin.getVersion();
-          
-          setLanguage(language);
-          
+		this.plugin = plugin;
+        this.silentMode = plugin.getConfig().getBoolean("silent_mode");
+        loadMessageFiles();
+        setLanguage(language);
     }
 	
 	//Silent mode settings
@@ -33,6 +34,21 @@ public class Messages {
 		this.silentMode = setting;
 	}
 	
+	//Load the message files
+	public void loadMessageFiles() {
+		for (String lang : LANGUAGES) {
+		    File msgFile = new File("plugins/" + plugin.getPluginName() + "/lang/", lang.toLowerCase() + ".yml");
+		    if (!msgFile.exists()) {
+		    	plugin.saveResource("lang/" + lang.toLowerCase() + ".yml", false);
+		    }
+		}
+    }
+	
+	//Language getter & setter
+	public String getLanguage() {
+		return this.language;
+	}
+
 	//Language settings
 	public void setLanguage (String language) {
 		this.language = language.toLowerCase();
@@ -42,33 +58,21 @@ public class Messages {
 	
 	//Console messages
 	public void makeConsoleMsg(String msg) {
-		
-		if (this.silentMode) {
-			return;
+		if (!this.silentMode) {
+			String v = msg.equals("cmdVersion")?plugin.getVersion():"";
+			String msgStr = msgFileConfig.getString("console." + msg) + v;
+			System.out.println(msgStr);
 		}
-		
-		switch (msg) {	
-			case "cmdVersion":
-				System.out.println("v" + VERSION);
-				break;
-			default:
-				System.out.println( msgFileConfig.getString("console." + msg) );
-				break;
-		}
-		
 	}
 	
 	//Player messages (in-game)
 	public void makeMsg(Player player, String msg) {
-		
-		if (this.silentMode && !msg.equals("errorSilentMode") && !msg.equals("cmdSilentOn") && !msg.equals("cmdSilentOff")) {
-			return;
+		ArrayList<String> pass = new ArrayList<>(Arrays.asList("errorSilentMode", "cmdSilentOn", "cmdSilentOff"));
+		if (!this.silentMode || pass.contains(msg)) {
+			String v = msg.equals("cmdVersion")?plugin.getVersion():"";
+			String msgStr = msgFileConfig.getString("player." + msg) + v;
+			player.sendMessage(ChatColor.translateAlternateColorCodes('&', msgStr));
 		}
-
-		String text = ChatColor.translateAlternateColorCodes('&', msgFileConfig.getString("player." + msg));
-		String vText = (msg == "cmdVersion" ? VERSION : "");
-		player.sendMessage( text + vText );
-	
 	}
 		
 }

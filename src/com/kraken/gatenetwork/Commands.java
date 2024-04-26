@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,7 +16,7 @@ import com.kraken.gatenetwork.Network.Gate;
 
 public class Commands {
 	
-	//Globals
+	//Main instance
 	private GateNetwork plugin;
 	
 	//Constructor
@@ -29,18 +28,22 @@ public class Commands {
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 		
 		//Get object instances from the main plugin instance
-		Messages messenger = plugin.messenger;
+		Messages messenger = plugin.getMessenger();
 		Network network = plugin.getNetwork();
 		
 		//Set up some values
 		String command = cmd.getName();
-    	Player player = Bukkit.getServer().getPlayerExact("krakenmyboy");
+    	Player player = null;
+		String worldName = null;
 		boolean isPlayer = false;
+		boolean isGate = false;
 		
 		//Check if sender is a player
         if ( sender instanceof Player ) {
         	player = (Player) sender;
         	isPlayer = true;
+    		worldName = player.getWorld().getName();
+    		isGate = network.getGateLocs().containsKey(worldName);
         }
 		
 		//Gates config files
@@ -59,9 +62,6 @@ public class Commands {
 					}
 				} else if (args.length == 1) {
 					
-					String worldName = player.getWorld().getName();
-					boolean isGate = network.getGateLocs().containsKey(worldName);
-					
 					switch(args[0]) {
 					
 						//List all gates
@@ -69,7 +69,11 @@ public class Commands {
 							
 							int count = 0;
 							for (String gate : gatesConfig.getKeys(false)) {
-						    	player.sendMessage(ChatColor.BLUE + "[GN]" + ChatColor.GRAY + " | Gate " + count + ": " + ChatColor.GREEN + gate);
+								if (isPlayer) {
+									player.sendMessage(ChatColor.BLUE + "[GN]" + ChatColor.GRAY + " | Gate " + count + ": " + ChatColor.GREEN + gate);
+								} else {
+									plugin.getLogger().info("Gate " + count + ": " + gate);
+								}
 						    	count++;
 						    }
 							
@@ -79,6 +83,7 @@ public class Commands {
 						case "build":
 						case "place":
 							
+							//Player only command
 							if (!isPlayer) {
 								messenger.makeConsoleMsg("errorPlayerCommand");
 								break;
@@ -114,6 +119,7 @@ public class Commands {
 						//Set a gate location to config
 						case "new":
 							
+							//Player only command
 							if (!isPlayer) {
 								messenger.makeConsoleMsg("errorPlayerCommand");
 								break;
@@ -149,6 +155,7 @@ public class Commands {
 						case "remove":
 						case "del":
 							
+							//Player only command
 							if (!isPlayer) {
 								messenger.makeConsoleMsg("errorPlayerCommand");
 								break;
@@ -206,7 +213,9 @@ public class Commands {
 						//Information about a world's gate
 						case "info":
 							
-							if (gatesConfig.getKeys(false).contains(args[1])) {
+							//Check if the gate exists
+							isGate = gatesConfig.getKeys(false).contains(args[1]);
+							if (isGate) {
 								
 								//Loop through each label and key in their matched arrays
 								String[] dataLabels = {"Gate Location", "Dial Location", "Gate Address", "Point of Origin", "World Name", "Active Wormhole", "Start Time", "Connected to", "Gate Dialer", "Server Name"};
@@ -219,7 +228,11 @@ public class Commands {
 								}
 								
 							} else {
-								messenger.makeMsg(player, "errorGateNotInWorld");
+								if (isPlayer) {
+									messenger.makeMsg(player, "errorGateNotInWorld");
+								} else {
+									messenger.makeConsoleMsg("errorNoGateInWorld");
+								}
 							}
 							
 							break;
@@ -229,14 +242,15 @@ public class Commands {
 						case "dial":
 						case "activate":
 							
+							//Player only command
 							if (!isPlayer) {
 								messenger.makeConsoleMsg("errorPlayerCommand");
 								break;
 							}
 							
-							boolean isGate = gatesConfig.getKeys(false).contains(args[1]);
+							//Check if gate exists
+							isGate = gatesConfig.getKeys(false).contains(args[1]);
 							if (!isGate) {
-								//World not found
 								break;
 							}
 						    
@@ -276,14 +290,15 @@ public class Commands {
 						case "dial":
 						case "activate":
 							
+							//Player only command
 							if (!isPlayer) {
 								messenger.makeConsoleMsg("errorPlayerCommand");
 								break;
 							}
 							
-							boolean isGate = gatesConfig.getKeys(false).contains(args[1]) && gatesConfig.getKeys(false).contains(args[2]);
+							//Check if gate exists
+							isGate = gatesConfig.getKeys(false).contains(args[1]) && gatesConfig.getKeys(false).contains(args[2]);
 							if (!isGate) {
-								//World not found
 								break;
 							}
 						    
@@ -318,9 +333,10 @@ public class Commands {
 					
 						//Set a gate's config info
 						case "set":
-							
-							if (!gatesConfig.getKeys(false).contains(args[1])) {
-								//World not found
+
+							//Check if gate exists
+							isGate = gatesConfig.getKeys(false).contains(args[1]);
+							if (!isGate) {
 								break;
 							}
 
@@ -333,6 +349,7 @@ public class Commands {
 							  //Set a gate dial location to config
 								case "dial":
 									
+									//Player only command
 									if (!isPlayer) {
 										messenger.makeConsoleMsg("errorPlayerCommand");
 										break;
@@ -350,7 +367,8 @@ public class Commands {
 								    net.update(gate, false, true);
 								    
 								    //Dial location set success message
-								    
+									messenger.makeMsg(player, "cmdSetGateDial");
+									
 									break;
 						    	
 						    	//Set the gate address
@@ -385,6 +403,11 @@ public class Commands {
 								    net.update(gate, false, true);
 								    
 								    //Address set success message
+									if (isPlayer) {
+										messenger.makeMsg(player, "cmdSetGateAddress");
+									} else {
+										messenger.makeConsoleMsg("cmdSetGateAddress");
+									}
 								    
 						    		break;
 						    	
@@ -403,6 +426,11 @@ public class Commands {
 								    net.update(gate, false, true);
 								    
 								    //Point of origin symbol set success message
+									if (isPlayer) {
+										messenger.makeMsg(player, "cmdSetGatePoint");
+									} else {
+										messenger.makeConsoleMsg("cmdSetGatePoint");
+									}
 								    
 						    		break;
 						    	
@@ -415,6 +443,11 @@ public class Commands {
 								    net.update(gate, false, true);
 								    
 								    //Gate name set success message
+									if (isPlayer) {
+										messenger.makeMsg(player, "cmdSetGateName");
+									} else {
+										messenger.makeConsoleMsg("cmdSetGateName");
+									}
 								    
 						    		break;
 						    		

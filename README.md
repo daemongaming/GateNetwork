@@ -28,8 +28,6 @@ A Minecraft plugin for **custom multiworld portals** with support for **multiple
 
 ## Commands
 
-*Note: Most commands are player only, which means they should be used in-game and not in the console. Support for console commands will be added in an upcoming version.*
-
 **/gate**
   * **build**
     * *Builds a default structure for you in the world which can be used to set a new gate.*
@@ -94,15 +92,7 @@ If the dial is successful, a wormhole will be established. If the other gate is 
 
 **How do I keep my inventory, etc., across servers?**
 
-**ServerSync**: ``https://github.com/daemongaming/ServerSync``
-
-Each server on BungeeCord has its own player data, which means inventories and such will be different when traveling to a different server.
-
-The solution to this issue is to use a plugin to synchronize the player data between servers. Unfortunately, I could not find many options for the newest versions of MC.
-
-So I built a separate plugin called *ServerSync* to handle player data synchronization between Minecraft servers. It is similarly available for free and the code is available on GitHub.
-
-I did not include server syncing in GateNetwork because admins can use either plugin for their respective purposes without requiring the other. Cheers!
+**ServerSync** plugin: ``https://github.com/daemongaming/ServerSync``
 
 ## Roadmap
 

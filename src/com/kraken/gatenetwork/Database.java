@@ -9,7 +9,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 
 public class Database {
 	
-	//Main class instance
+	//Main instance
 	private GateNetwork plugin;
 	
     //JDBC driver

@@ -3,7 +3,6 @@ package com.kraken.gatenetwork;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.WeakHashMap;
 
 import org.bukkit.Bukkit;
@@ -20,20 +19,13 @@ import org.bukkit.scheduler.BukkitScheduler;
 public class GateNetwork extends JavaPlugin {
 
 	//Main instances
-	public static GateNetwork plugin;
 	private Network network;
 	private DialDevice dial;
 	private Traveling traveling;
 	private Database db;
+	private Messages messenger;
 	
-	//Lang objects
-	public static String PLUGIN_NAME = "GateNetwork";
-	public static String VERSION;
-	public static String SERVER_NAME;
-	ArrayList<String> languages = new ArrayList<String>();
-	Messages messenger;
-	
-	//Options
+	//Plugin settings mappings
 	WeakHashMap<String, Boolean> options = new WeakHashMap<>();
 	
 	//Cooldowns
@@ -43,56 +35,38 @@ public class GateNetwork extends JavaPlugin {
     public void onEnable() {
     	
     	//Plugin start-up
-    	plugin = this;
 		PluginManager pm = getServer().getPluginManager();
 		
 		//Register plugin messages
 		this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
 		
-		//Copies the default config.yml from within the .jar if "plugins/<name>/config.yml" does not exist
-		getConfig().options().copyDefaults(true);
+		//Default files
+		getConfig().options().copyDefaults(true); // default config.yml
+		loadDefaultFiles(); // custom yml configs
 		
-		//Language/Messages handler class construction
-		languages.add("english");
-		languages.add("spanish");
-		loadMessageFiles();
-		messenger = new Messages(this, "english");
-		
-		//Load the build default files
-		loadDefaultFiles();
-		
-	    //Loading default settings into options
-		ArrayList<String> optionsToSet = new ArrayList<String>();
-		optionsToSet.addAll(Arrays.asList("debug_mode", "silent_mode", "easy_mode", "op_required", "permissions"));
-		
-		//Load boolean options
-		for (String opt : optionsToSet) {
+	    //Plugin settings
+		String[] opts = {"debug_mode", "silent_mode", "easy_mode", "op_required", "permissions"};
+		for (String opt : opts) {
 			setOption(opt, getConfig().getBoolean(opt));
 		}
-    	
-		//Get the server name from config
-    	SERVER_NAME = getConfig().getString("server_name");
-    	
-    	//Check to enable silent mode
-    	silencer(options.get("silent_mode"));
 		
-        //Starts and registers the main Listener
+		//Messages
+		String lang = getConfig().getString("language");
+		messenger = new Messages(this, lang);
+		
+        //Traveling
   		this.traveling = new Traveling(this);
   		pm.registerEvents((Listener) traveling, this);
     	
-        //Starts and registers the DialDevice Listener
+        //DialDevice
   		this.dial = new DialDevice(this);
   		pm.registerEvents((Listener) dial, this);
   		
-  		//Starts and registers the Network Listener
+  		//Network
     	this.network = new Network(this);
-  		pm.registerEvents((Listener) network, this);
     	
-  		//Set the database info
+  		//Database
   		db = new Database(this);
-        
-        //Get the plugin version number
-        VERSION = getFileConfig("plugin").getString("version");
     	
     }
     
@@ -122,8 +96,6 @@ public class GateNetwork extends JavaPlugin {
 		return cmds.onCommand(sender, cmd, label, args);
     }
 	
-	//GETTERS
-	
     //Return the database object
     public Database getDatabase() {
     	return db;
@@ -131,7 +103,7 @@ public class GateNetwork extends JavaPlugin {
     
 	//Get a FileConfiguration from file name
 	public File getFile(String fileName) {
-	    File f = new File("plugins/" + PLUGIN_NAME, fileName + ".yml");
+	    File f = new File("plugins/" + getPluginName(), fileName + ".yml");
 	    return f;
 	}
     
@@ -143,17 +115,17 @@ public class GateNetwork extends JavaPlugin {
 	
 	//Get the plugin name
 	public String getPluginName() {
-		return PLUGIN_NAME;
+		return "GateNetwork";
 	}
 	
 	//Get the plugin version
 	public String getVersion() {
-		return VERSION;
+		return getFileConfig("plugin").getString("version");
 	}
 	
 	//Get the Bungee server name value loaded from config
 	public String getServerName() {
-		return SERVER_NAME;
+		return getConfig().getString("server_name");
 	}
 	
 	//Return the global class instances
@@ -168,8 +140,11 @@ public class GateNetwork extends JavaPlugin {
 	public Traveling getTraveling() {
 		return this.traveling;
 	}
-    
-	//SETTERS
+	
+    //Get the Messages
+    public Messages getMessenger() {
+    	return this.messenger;
+    }
     
     //Save the player file
     public void saveCustomFile(FileConfiguration fileConfig, File file) {
@@ -190,37 +165,20 @@ public class GateNetwork extends JavaPlugin {
     	}
     }
     
-    //Silent mode setting
-    public void silencer(boolean silentMode) {
-    	messenger.silence(silentMode);
-    }
-	
-    //LOADERS
-    
 	//Load files from default if not present
-	public void loadDefaultFiles() {
+	private void loadDefaultFiles() {
 		
 		//Default files to be loaded: schematic.yml, dial.yml
 		String[] files = {"schematic", "dial"};
 		
 		//Check each file and save from defaults if not present
 		for (String fName : files) {
-			File file = new File("plugins/" + PLUGIN_NAME + "/", fName + ".yml");
+			File file = new File("plugins/" + getPluginName() + "/", fName + ".yml");
 		    if ( !file.exists() ) {
 		    	saveResource(fName + ".yml", false);
 		    }
 		}
 	    
-    }
-	
-    //Load the files for messages based on language setting
-	public void loadMessageFiles() {
-		for (String lang : languages) {
-		    File msgFile = new File("plugins/" + PLUGIN_NAME + "/lang/", lang.toLowerCase() + ".yml");
-		    if ( !msgFile.exists() ) {
-		    	saveResource("lang/" + lang.toLowerCase() + ".yml", false);
-		    }
-		}
     }
     
     //Remove cooldown after 0.5 sec

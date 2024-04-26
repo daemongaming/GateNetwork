@@ -21,7 +21,7 @@ import com.kraken.gatenetwork.Network.Gate;
 
 public class Wormhole {
 	
-	//Globals
+	//Main instance
 	private GateNetwork plugin;
 	
 	//Wormhole constructor

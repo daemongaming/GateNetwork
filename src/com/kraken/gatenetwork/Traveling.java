@@ -2,6 +2,7 @@ package com.kraken.gatenetwork;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.WeakHashMap;
@@ -11,9 +12,11 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.scheduler.BukkitScheduler;
 
@@ -23,7 +26,7 @@ import com.kraken.gatenetwork.Network.Gate;
 
 public class Traveling implements Listener {
 	
-	//Globals
+	//Main instance
 	private GateNetwork plugin;
 	
 	//Player travel check cooldown
@@ -31,6 +34,131 @@ public class Traveling implements Listener {
 	
 	public Traveling(GateNetwork plugin) {
 		this.plugin = plugin;
+	}
+	
+    //Gateway teleport processing (just in case something needs to be done in-between)
+	public void teleport(Player player, Location destination) {
+		player.teleport(destination);
+	}
+	
+	@EventHandler
+	public void onPlayerJoin(PlayerJoinEvent e) {
+		
+		Network net = plugin.getNetwork();
+		net.updateAllGates(false);
+		
+		//Get the debug mode option for console messages
+    	boolean debugMode = plugin.options.get("debug_mode");
+
+    	//Player values
+		Player player = (Player) e.getPlayer();
+		String playerName = player.getDisplayName();
+		
+		Traveling travel = plugin.getTraveling();
+		ArrayList<Player> travelers = travel.getTravelers();
+		travelers.add(player);
+		
+		//Set up a slightly delayed task to check if the player has a destination from the travel database
+		BukkitScheduler scheduler = Bukkit.getServer().getScheduler();
+		
+		scheduler.scheduleSyncDelayedTask(plugin, new Runnable() {
+            @Override
+            public void run() {
+            	
+            	if (debugMode) {
+    				plugin.getLogger().info("Querying for player travel data...");
+    			}
+            	
+            	//Get the database connection to make queries
+            	Database db = plugin.getDatabase();
+            	Connection dbConn = db.getConnection();
+            	
+            	String dWorld = "false";
+            	String oWorld = "false";
+				
+				//Get the player's travel data
+				String query = "SELECT destination, origin FROM travel WHERE player=?";
+				
+				try (PreparedStatement getTravelData = dbConn.prepareStatement(query)) {
+					
+					getTravelData.setString(1, playerName);
+					ResultSet rs = getTravelData.executeQuery();
+					
+					while (rs.next()) {
+						dWorld = rs.getString(1);
+						oWorld = rs.getString(2);
+					}
+					
+				} catch (SQLException e1) {
+					if (debugMode) {
+						plugin.getLogger().info("Error getting player travel data.");
+					}
+					e1.printStackTrace();
+				}
+		    			
+    			//Gates config files
+    		    FileConfiguration gatesConfig = plugin.getFileConfig("gates");
+    		    
+    		    if (gatesConfig.getKeys(false).contains(dWorld)) {
+    		    	
+					if (debugMode) {
+    					plugin.getLogger().info("Teleporting player to " + dWorld);
+    				}
+    		    	
+    		    	//Send the player to the appropriate destination
+					String dTele = gatesConfig.getString(dWorld + ".loc");
+    				Location destination = LocSerialization.getLiteLocationFromString(dTele);
+    				
+    				//Teleport location generated from gate center location
+    				destination.add(2.5, -3, 0.5);
+    				// Turn the player the right way
+    				destination.setYaw(-90);
+    				destination.setPitch(0);
+        			
+        			//Clear the player's travel data from the database
+					String query2 = "DELETE FROM travel WHERE player=?";
+					
+					try (PreparedStatement delTravelData = dbConn.prepareStatement(query2)) {
+						
+						delTravelData.setString(1, playerName);
+						delTravelData.executeUpdate();
+						
+					} catch (SQLException e1) {
+						if (debugMode) {
+	    					plugin.getLogger().info("Error removing player travel data from database.");
+	    				}
+						e1.printStackTrace();
+					}
+
+    				//Teleport the player
+        			teleport(player, destination);
+        			
+        			//Play wormhole travel effects to the player
+        			travel.playTravelEffects(player, net.getGate(oWorld).name, net.getGate(dWorld).name);
+        			
+    		    } else {
+			    	
+    		    	if (debugMode) {
+    					plugin.getLogger().info("No travel data found on join or player does not have travel data.");
+    				}
+    		    	
+    		    }
+    			
+    			//Remove the player from the traveling cooldown
+    			BukkitScheduler scheduler = Bukkit.getServer().getScheduler();
+				scheduler.scheduleSyncDelayedTask(plugin, new Runnable() {
+	                @Override
+	                public void run() {
+				    	travelers.remove(player);
+	                }
+	            }, 20);
+    		    
+    		    //Close the database connection
+    		    db.closeConnection();
+    			
+            }
+        }, 20);
+		
 	}
       
 	@EventHandler
@@ -42,7 +170,7 @@ public class Traveling implements Listener {
 		World world = p.getWorld();
 		String worldName = world.getName();
 		Network net = plugin.getNetwork();
-		WeakHashMap<String, String> connections = net.connections.get();
+		WeakHashMap<String, String> connections = net.getConnections();
 		
 		//Travel cooldown check
 		boolean traveling = travelCooldown.contains(p);
@@ -77,7 +205,7 @@ public class Traveling implements Listener {
 				//Vaporize the player
 		    	world.playSound(loc, Sound.ENTITY_PLAYER_SPLASH, 4.0F, 1.0F);
 				p.setHealth(0.0);
-				plugin.messenger.makeMsg(p, "eventVaporized");
+				plugin.getMessenger().makeMsg(p, "eventVaporized");
 				return;
 			}
 			
@@ -125,7 +253,7 @@ public class Traveling implements Listener {
     				dLoc.setYaw(-90);
     				dLoc.setPitch(0);
         			
-					net.teleport(p, dLoc);
+					teleport(p, dLoc);
 					
 					playTravelEffects(p, gate.name, dGate.name);
 					

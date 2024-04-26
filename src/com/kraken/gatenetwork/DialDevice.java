@@ -25,7 +25,7 @@ import org.bukkit.inventory.ItemStack;
 
 public class DialDevice implements Listener {
 	
-	//Globals
+	//Main instance
 	private GateNetwork plugin;
 	
 	//The GUI inventory menu for the dial device
@@ -113,7 +113,7 @@ public class DialDevice implements Listener {
 				    FileConfiguration gatesConfig = getFileConfig("gates");
 				    
 					//Check values
-					WeakHashMap<String, String> connections = net.connections.get();
+					WeakHashMap<String, String> connections = net.getConnections();
 					boolean isOrigin = connections.containsKey(wName);
 					boolean isDestination = connections.containsValue(wName);
 					String dwName = gatesConfig.getString(wName + ".destination");
@@ -125,7 +125,7 @@ public class DialDevice implements Listener {
 								
 						Wormhole wormhole = new Wormhole(plugin);
 						wormhole.establish(false, "none", isOrigin?wName:dwName, isOrigin?dwName:wName);
-						plugin.messenger.makeMsg(player, "eventGateDeactivated");
+						plugin.getMessenger().makeMsg(player, "eventGateDeactivated");
 						return;
 						
 					//Access the dial GUI
@@ -338,9 +338,11 @@ public class DialDevice implements Listener {
 		Network net = plugin.getNetwork();
 		WeakHashMap<ArrayList<Integer>, String> addresses = net.getAddresses();
 		
+		Messages messenger = plugin.getMessenger();
+		
 		if (addresses.containsKey(sixDigitAddress) && sequence.get(7).equals(22)) {
 
-			WeakHashMap<String, String> connections = net.connections.get();
+			WeakHashMap<String, String> connections = net.getConnections();
 			String destination = addresses.get(sixDigitAddress);
 			boolean active = connections.containsValue(destination) || connections.containsKey(destination);
 			
@@ -353,7 +355,7 @@ public class DialDevice implements Listener {
 
 				//Play dial red crystal press sound
 		    	p.getWorld().playSound(p.getLocation(), Sound.BLOCK_ANVIL_PLACE, 10.0F, 2.0F);
-		    	plugin.messenger.makeMsg(p, "eventDialFailure");
+		    	messenger.makeMsg(p, "eventDialFailure");
 		    	
 				return 0;
 				
@@ -369,7 +371,7 @@ public class DialDevice implements Listener {
 
 			//Play dial red crystal press sound
 	    	p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_BREAK, 6.0F, 0.5F);
-	    	plugin.messenger.makeMsg(p, "eventDialSuccess");
+	    	messenger.makeMsg(p, "eventDialSuccess");
 	    	
 			return 1;
 			
@@ -381,7 +383,7 @@ public class DialDevice implements Listener {
 
 			//Play dial red crystal press sound
 	    	p.getWorld().playSound(p.getLocation(), Sound.BLOCK_ANVIL_PLACE, 8.0F, 1.0F);
-	    	plugin.messenger.makeMsg(p, "eventDialFailure");
+	    	messenger.makeMsg(p, "eventDialFailure");
 	    	
 			return 0;
 			

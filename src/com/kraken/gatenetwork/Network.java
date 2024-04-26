@@ -15,23 +15,17 @@ import java.util.WeakHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.scheduler.BukkitScheduler;
 
-public class Network implements Listener {
+public class Network {
 	
-	//Globals
+	//Main instance
 	private GateNetwork plugin;
-	public Connections connections;
 	
 	//Network constructor
     public Network(GateNetwork plugin) {
     	
     	this.plugin = plugin;
-    	connections = new Connections();
   		
     	//Check wormholes timer (every 300 ticks, or 15 sec)
     	BukkitScheduler scheduler = Bukkit.getServer().getScheduler();
@@ -44,7 +38,7 @@ public class Network implements Listener {
 		
     }
     
-    //Gate class object
+    //Gate class object (would immutable records be better? we'll see...)
     public class Gate {
     	
     	//Gate data vars
@@ -89,154 +83,24 @@ public class Network implements Listener {
     }
     
     //Active wormhole connections class object
-	public class Connections {
-		
-		//Get all active wormhole connections
-		public WeakHashMap<String, String> get() {
-		    
-		    //A map of all wormholes (originWorld=destinationWorld)
-			WeakHashMap<String, String> connections = new WeakHashMap<String, String>();
+	public WeakHashMap<String, String> getConnections() {
+	    
+	    //A map of all wormholes (originWorld=destinationWorld)
+		WeakHashMap<String, String> connections = new WeakHashMap<String, String>();
 
-			//Get all gates
-			WeakHashMap<String, Gate> gates = getGates();
-			
-			//Check if the gate is an active origin gate and add to the connections map
-			for (String world : gates.keySet()) {
-				Gate gate = gates.get(world);
-				if (gate.active && (!gate.dialer.equals("false"))) {
-					connections.put(world, gate.destination);
-				}
+		//Get all gates
+		WeakHashMap<String, Gate> gates = getGates();
+		
+		//Check if the gate is an active origin gate and add to the connections map
+		for (String world : gates.keySet()) {
+			Gate gate = gates.get(world);
+			if (gate.active && (!gate.dialer.equals("false"))) {
+				connections.put(world, gate.destination);
 			}
-			
-			return connections;
-			
 		}
 		
-	}
-	
-	@EventHandler
-	public void onPlayerJoin(PlayerJoinEvent e) {
+		return connections;
 		
-		updateAllGates(false);
-		
-		//Get the debug mode option for console messages
-    	boolean debugMode = plugin.options.get("debug_mode");
-
-    	//Player values
-		Player player = (Player) e.getPlayer();
-		String playerName = player.getDisplayName();
-		
-		//Set up a slightly delayed task to check if the player has a destination from the travel database
-		BukkitScheduler scheduler = Bukkit.getServer().getScheduler();
-		
-		scheduler.scheduleSyncDelayedTask(plugin, new Runnable() {
-            @Override
-            public void run() {
-            	
-            	if (debugMode) {
-    				plugin.getLogger().info("Querying for player travel data...");
-    			}
-            	
-            	//Get the database connection to make queries
-            	Database db = plugin.getDatabase();
-            	Connection dbConn = db.getConnection();
-            	
-            	String dWorld = "false";
-            	String oWorld = "false";
-				
-				//Get the player's travel data
-				String query = "SELECT destination, origin FROM travel WHERE player=?";
-				
-				try (PreparedStatement getTravelData = dbConn.prepareStatement(query)) {
-					
-					getTravelData.setString(1, playerName);
-					ResultSet rs = getTravelData.executeQuery();
-					
-					while (rs.next()) {
-						dWorld = rs.getString(1);
-						oWorld = rs.getString(2);
-					}
-					
-				} catch (SQLException e1) {
-					if (debugMode) {
-						plugin.getLogger().info("Error getting player travel data.");
-					}
-					e1.printStackTrace();
-				}
-		    			
-    			//Gates config files
-    		    FileConfiguration gatesConfig = plugin.getFileConfig("gates");
-    		    
-    		    if (gatesConfig.getKeys(false).contains(dWorld)) {
-    		    	
-					if (debugMode) {
-    					plugin.getLogger().info("Teleporting player to " + dWorld);
-    				}
-    		    	
-    		    	//Send the player to the appropriate destination
-					String dTele = gatesConfig.getString(dWorld + ".loc");
-    				Location destination = LocSerialization.getLiteLocationFromString(dTele);
-    				
-    				//Teleport location generated from gate center location
-    				destination.add(2.5, -3, 0.5);
-    				// Turn the player the right way
-    				destination.setYaw(-90);
-    				destination.setPitch(0);
-        			
-        			//Clear the player's travel data from the database
-					String query2 = "DELETE FROM travel WHERE player=?";
-					
-					try (PreparedStatement delTravelData = dbConn.prepareStatement(query2)) {
-						
-						delTravelData.setString(1, playerName);
-						delTravelData.executeUpdate();
-						
-					} catch (SQLException e1) {
-						if (debugMode) {
-	    					plugin.getLogger().info("Error removing player travel data from database.");
-	    				}
-						e1.printStackTrace();
-					}
-
-					//Add the player to the traveling cooldown
-					Traveling travel = plugin.getTraveling();
-					ArrayList<Player> travelers = travel.getTravelers();
-					travelers.add(player);
-
-    				//Teleport the player
-        			teleport(player, destination);
-        			
-        			//Play wormhole travel effects to the player
-        			travel.playTravelEffects(player, getGate(oWorld).name, getGate(dWorld).name);
-        			
-        			//Remove the player from the traveling cooldown
-        			BukkitScheduler scheduler = Bukkit.getServer().getScheduler();
-    				scheduler.scheduleSyncDelayedTask(plugin, new Runnable() {
-    	                @Override
-    	                public void run() {
-    				    	travelers.remove(player);
-    	                }
-    	            }, 80);
-        			
-    		    } else {
-    		    	
-    		    	if (debugMode) {
-    					plugin.getLogger().info("No travel data found on join or player does not have travel data.");
-    				}
-    		    	
-    		    }
-    		    
-    		    //Close the database connection
-    		    db.closeConnection();
-    			
-            }
-        }, 20);
-		
-	}
-    
-    //Gateway teleport processing (just in case something needs to be done in-between)
-	public void teleport(Player player, Location destination) {
-		player.teleport(destination);
 	}
 	
 	//Update the gates file with new gate info
@@ -287,18 +151,14 @@ public class Network implements Listener {
 						gateAddress += ",";
 					}
 				}
+				
+				String[] vals = {gate.world, gate.loc, gate.dial, gateAddress, gate.pointoforigin, gate.name, gate.active?"true":"false", gate.start, gate.destination, gate.dialer, gate.server};
 	
-				setGatesData.setString(1, gate.world);
-				setGatesData.setString(2, gate.loc);
-				setGatesData.setString(3, gate.dial);
-				setGatesData.setString(4, gateAddress);
-				setGatesData.setString(5, gate.pointoforigin);
-				setGatesData.setString(6, gate.name);
-				setGatesData.setString(7, gate.active?"true":"false");
-				setGatesData.setString(8, gate.start);
-				setGatesData.setString(9, gate.destination);
-				setGatesData.setString(10, gate.dialer);
-				setGatesData.setString(11, gate.server);
+				int n = 1;
+				for (String val : vals) {
+					setGatesData.setString(n, val);
+					n++;
+				}
 				
 				if (!isNew) {
 					setGatesData.setString(12, gate.world);
